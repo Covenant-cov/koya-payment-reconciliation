@@ -1,19 +1,31 @@
 # Payment reconciliation
 
-`payments.jsonl` is an export of payment events from a payments provider, one JSON object per line. The reconciliation script is meant to work out how much money was actually collected, but it doesn't work.
+Works out how much money was actually collected from a raw export of payment events, and checks the result against the finance team's hand count.
 
-Fix it, in Python (`reconcile.py`) or JavaScript (`reconcile.js`), whichever you prefer. When it's right, it prints a code. Paste that code into the application form.
+Forked from [quadri40/koya-payment-reconciliation](https://github.com/quadri40/koya-payment-reconciliation), where the original script did not produce the right figures. The fix is in `reconcile.py`.
 
 ## How the data works
 
-- Each line is one event: `txn_id`, `status` (`success`, `failed` or `pending`), `amount` in naira, `currency`, and `ts` (when it happened, UTC).
-- A payment can be attempted more than once. Every attempt has the same `txn_id`. Only the latest attempt for each `txn_id` counts.
+- `payments.jsonl` holds one event per line: `txn_id`, `status` (`success`, `failed` or `pending`), `amount` in naira, `currency`, and `ts` (when it happened, UTC).
+- A payment can be attempted more than once. Every attempt has the same `txn_id`, and only the latest attempt counts.
 - A payment counts as collected only if its latest attempt is `success`.
-- The export comes from a production system and isn't perfectly clean. Ignore lines that can't be read, and events without a `txn_id`. Every other event is valid and must be counted correctly.
-- `expected.txt` holds the number of successful payments the finance team counted by hand. The script checks itself against it.
+- The export comes from a production system and isn't perfectly clean. Lines that can't be read, and events without a `txn_id`, are ignored.
+- `expected.txt` holds the number of successful payments counted by hand. The script checks itself against it.
 
-## What to submit
+## What was fixed
 
-1. Fork this repo, fix the script, and commit your fix to your fork.
-2. Run it. Paste the code it prints into the form.
-3. Paste the link to your fork into the form.
+1. **Retries.** About 7,800 of the 30,000 payments had more than one attempt. The original counted every successful attempt; the fix keeps only the latest attempt per `txn_id` (by timestamp) and counts it only if it succeeded.
+2. **Corrupt rows.** 25 truncated lines and 15 events with no `txn_id` crashed the original. They are now skipped.
+3. **Amounts stored as text.** About 2,300 amounts arrived as strings with thousands separators, such as `"55,707.77"`. They are now parsed correctly.
+
+## Run it
+
+```bash
+python reconcile.py
+```
+
+```
+Check passed: 22733 successful payments.
+```
+
+The count matches the finance team's figure in `expected.txt`.
